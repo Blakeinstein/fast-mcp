@@ -72,6 +72,43 @@ Or run both the watcher and inspector:
 npm run dev
 ```
 
+## Docker Support
+
+This project includes Docker support for both production and development environments.
+
+### Building and Running with Docker
+
+#### Production Build
+```bash
+# Build the Docker image
+docker build -t fast-mcp .
+
+# Run the container
+docker run --rm fast-mcp
+```
+
+#### Using Docker Compose
+```bash
+# Build and run in production mode
+docker-compose up --build
+
+# Run in development mode with hot reload
+docker-compose --profile dev up --build fast-mcp-dev
+```
+
+#### Development with Docker
+The development setup includes:
+- Hot reloading with `pnpm run dev`
+- Volume mounting for live code changes
+- All development dependencies included
+
+### Docker Configuration
+
+- **Dockerfile**: Production-ready image with Node.js 24 Alpine
+- **Dockerfile.dev**: Development image with hot reload support
+- **docker-compose.yml**: Orchestration for both production and development
+- **.dockerignore**: Optimized build context
+
 ## Publishing
 
 Once you're ready to distribute your server, it's simple! 

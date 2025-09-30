@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  fast-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fast-mcp-server
+    restart: unless-stopped
+    # For MCP servers, we typically use stdio transport, so no ports needed
+    # But keeping this commented in case HTTP transport is added later
+    # ports:
+    #   - "3000:3000"
+    
+    # Environment variables (add as needed)
+    environment:
+      - NODE_ENV=production
+    
+    # Volume mounts for development (uncomment for development)
+    # volumes:
+    #   - ./config:/app/config:ro
+    #   - ./dist:/app/dist
+    
+    # Health check (optional)
+    healthcheck:
+      test: ["CMD", "node", "-e", "process.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Development service with hot reload
+  fast-mcp-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: fast-mcp-dev
+    restart: unless-stopped
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+    command: pnpm run dev
+    profiles:
+      - dev
+
+

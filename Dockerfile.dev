@@ -1,0 +1,36 @@
+# Development Dockerfile with hot reload
+FROM node:24-alpine
+
+# Install build dependencies for native modules
+RUN apk add --no-cache python3 make g++
+
+# Set working directory
+WORKDIR /app
+
+# Install pnpm globally
+RUN npm install -g pnpm
+
+# Copy package files
+COPY package*.json pnpm-lock.yaml pnpm-workspace.yaml ./
+
+# Install dependencies (including dev dependencies)
+RUN pnpm install
+
+# Copy source code
+COPY . .
+
+# Create a non-root user for security
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S mcp -u 1001
+
+# Change ownership of the app directory to the nodejs user
+RUN chown -R mcp:nodejs /app
+USER mcp
+
+# Expose port for development
+EXPOSE 3000
+
+# Default command for development (will be overridden by docker-compose)
+CMD ["pnpm", "run", "dev"]
+
+

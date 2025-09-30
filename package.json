@@ -19,7 +19,6 @@
   ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.15.0",
-    "curlconverter": "^4.12.0",
     "js-yaml": "^4.1.0",
     "zod": "^3.23.8",
     "zod-to-json-schema": "^3.24.1"

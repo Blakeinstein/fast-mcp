@@ -2,17 +2,23 @@ import { readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { z } from 'zod';
 import * as yaml from 'js-yaml';
-import { toJavaScript } from 'curlconverter';
 
 interface VariableConfig {
   required?: boolean;
   default?: string;
 }
 
+interface RequestTemplate {
+  URL: string;
+  METHOD: string;
+  HEADERS?: (string | Record<string, string>)[];
+  BODY?: string;
+}
+
 interface YamlConfig {
   name: string;
   variables: Record<string, VariableConfig>;
-  curl_command: string;
+  request_template: RequestTemplate;
 }
 
 export function parseYamlConfig(content: string): YamlConfig {
@@ -23,10 +29,20 @@ export function parseYamlConfig(content: string): YamlConfig {
       throw new Error('Invalid YAML content');
     }
     
+    if (!parsed.request_template) {
+      throw new Error('Missing request_template in YAML config');
+    }
+    
+    
     const config: YamlConfig = {
       name: parsed.name || '',
       variables: parsed.variables || {},
-      curl_command: parsed.curl_command || ''
+      request_template: {
+        URL: parsed.request_template.URL || '',
+        METHOD: parsed.request_template.METHOD || 'GET',
+        HEADERS: parsed.request_template.HEADERS || [],
+        BODY: parsed.request_template.BODY || ''
+      }
     };
     
     return config;
@@ -60,8 +76,10 @@ export async function createToolFromConfig(config: YamlConfig, server: any) {
       console.error(`${toolName} tool called`, args);
       
       try {
-        // Replace variables in the curl command
-        let curlCommand = config.curl_command;
+        // Replace variables in the request template
+        let url = config.request_template.URL;
+        let body = config.request_template.BODY || '';
+        
         Object.entries(config.variables).forEach(([varName, varConfig]) => {
           let value = args[varName];
           
@@ -70,29 +88,48 @@ export async function createToolFromConfig(config: YamlConfig, server: any) {
             value = varConfig.default || '';
           }
           
-          curlCommand = curlCommand.replace(new RegExp(`{${varName}}`, 'g'), value);
+          // Replace variables in URL and body
+          url = url.replace(new RegExp(`{${varName}}`, 'g'), value);
+          body = body.replace(new RegExp(`{${varName}}`, 'g'), value);
         });
         
-        // Convert curl command to JavaScript fetch
-        const jsCode = toJavaScript(curlCommand);
-        
-        // Parse the generated JavaScript to extract fetch parameters
-        const urlMatch = jsCode.match(/fetch\(['"`]([^'"`]+)['"`]/);
-        const optionsMatch = jsCode.match(/fetch\([^,]+,\s*({[^}]+})/);
-        
-        if (!urlMatch) {
-          throw new Error('Could not extract URL from curl command');
+        // Clean up the body - remove surrounding quotes if present
+        if (body.startsWith("'") && body.endsWith("'")) {
+          body = body.slice(1, -1);
+        } else if (body.startsWith('"') && body.endsWith('"')) {
+          body = body.slice(1, -1);
         }
         
-        const url = urlMatch[1];
-        let options: RequestInit = {};
         
-        if (optionsMatch) {
-            // Parse the options object from the generated JavaScript
-          const optionsStr = optionsMatch[1].replace(/'/g, '"');
-          options = JSON.parse(optionsStr);
-        } else {
-          throw new Error('Could not extract options from curl command');
+        // Build headers object
+        const headers: Record<string, string> = {};
+        if (config.request_template.HEADERS) {
+          config.request_template.HEADERS.forEach(header => {
+            if (typeof header === 'string') {
+              const [key, value] = header.split(':').map(s => s.trim());
+              if (key && value) {
+                headers[key] = value;
+              }
+            } else if (typeof header === 'object' && header !== null) {
+              // Handle object format headers
+              Object.entries(header).forEach(([key, value]) => {
+                if (typeof value === 'string') {
+                  headers[key] = value;
+                }
+              });
+            }
+          });
+        }
+        
+        // Build fetch options
+        const options: RequestInit = {
+          method: config.request_template.METHOD,
+          headers: headers
+        };
+        
+        // Add body if present and method supports it
+        if (body && ['POST', 'PUT', 'PATCH'].includes(config.request_template.METHOD)) {
+          options.body = body;
         }
         
         // Execute the fetch request

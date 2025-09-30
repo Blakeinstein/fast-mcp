@@ -3,24 +3,27 @@ variables:
   question: 
     required: true
 
-curl_command: | 
-  curl -X POST https://cognita-ps-backend.ml.tfy-eo.truefoundry.cloud/retrievers/basic-rag/answer \
-  -H "Content-Type: application/json" \
-  -d '{
-    "collection_name": "hg",
-    "query": "{question}",
-    "model_configuration": {
-      "name": "truefoundry/openai-main/gpt-4o-mini",
-      "parameters": {
-        "temperature": 0.1
-      }
-    },
-    "prompt_template": "You are an AI assistant specialising in information retrieval and analysis. \\nQuestion: {question}",
-    "retriever_name": "vectorstore",
-    "retriever_config": {
-      "search_type": "similarity",
-      "search_kwargs": {
-        "k": 5
+request_template:
+  URL: https://cognita-ps-backend.ml.tfy-eo.truefoundry.cloud/retrievers/basic-rag/answer
+  METHOD: POST
+  HEADERS:
+    - Content-Type: application/json
+  BODY: |
+    {
+      "collection_name": "hg",
+      "query": "{question}",
+      "model_configuration": {
+        "name": "truefoundry/openai-main/gpt-4o-mini",
+        "parameters": {
+          "temperature": 0.1
+        }
+      },
+      "prompt_template": "You are an AI assistant specialising in information retrieval and analysis. \\nQuestion: {question}",
+      "retriever_name": "vectorstore",
+      "retriever_config": {
+        "search_type": "similarity",
+        "search_kwargs": {
+          "k": 5
+        }
       }
     }
-  }'
