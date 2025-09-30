@@ -1,7 +1,7 @@
 {
-  "name": "mcp-starter",
+  "name": "fast-mcp",
   "version": "0.2.0",
-  "description": "ModelContextProtocol starter server",
+  "description": "ModelContextProtocol server from Curl requests",
   "type": "module",
   "scripts": {
     "make-executable": "node -e \"fs.chmodSync('dist/index.cjs', '755');\" --require fs",
@@ -18,9 +18,14 @@
     "dist"
   ],
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.15.0"
+    "@modelcontextprotocol/sdk": "^1.15.0",
+    "curlconverter": "^4.12.0",
+    "js-yaml": "^4.1.0",
+    "zod": "^3.23.8",
+    "zod-to-json-schema": "^3.24.1"
   },
   "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.10.1",
     "concurrently": "^8.2.2",
     "esbuild": "^0.24.0",
