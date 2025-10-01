@@ -1,8 +1,8 @@
 # Use Node.js 24 LTS as base image
 FROM node:24-alpine
 
-# Install build dependencies for native modules
-RUN apk add --no-cache python3 make g++
+# Install build dependencies for native modules and Python for mcp-proxy
+RUN apk add --no-cache python3 make g++ py3-pip netcat-openbsd
 
 # Set working directory
 WORKDIR /app
@@ -12,6 +12,9 @@ COPY package*.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
 # Install pnpm globally
 RUN npm install -g pnpm
+
+# Install mcp-proxy directly with --break-system-packages
+RUN pip install --break-system-packages mcp-proxy
 
 # Install dependencies (including native modules)
 RUN pnpm install --frozen-lockfile
@@ -33,10 +36,10 @@ RUN adduser -S mcp -u 1001
 RUN chown -R mcp:nodejs /app
 USER mcp
 
-# Expose port (if needed for future HTTP transport)
-EXPOSE 3000
+# Expose port for mcp-proxy streamable HTTP server
+EXPOSE 8096
 
-# Set the default command to run the MCP server
-CMD ["node", "dist/index.cjs"]
+# Set the default command to run the MCP server via mcp-proxy
+CMD ["mcp-proxy", "--port=8096", "--host=0.0.0.0", "--transport=streamablehttp", "node", "dist/index.cjs"]
 
 
