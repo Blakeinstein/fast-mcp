@@ -1,60 +1,102 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
+import express from "express";
 import { loadToolsFromConfigs } from "./create_tools.js";
 
-async function initializeServer() {
-  const server = new McpServer(
-    {
-      name: "fast-mcp",
-      version: "0.2.0",
-    },
-    {
-      capabilities: {
-        tools: {},
-        logging: {},
-      },
-    }
-  );
+const app = express();
+app.use(express.json());
 
-  // Load tools from YAML configs
-  await loadToolsFromConfigs(server);
-
-  // Keep the original hello tool as an example
-  server.tool(
-    "hello_tool",
-    "Hello tool",
-    {
-      name: z.string().describe("The name of the person to greet"),
-    },
-    async ({ name }) => {
-      console.error("Hello tool", { name });
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Hello, ${name}!`,
-          },
-        ],
-      };
-    }
-  );
-
-  process.on("SIGINT", async () => {
-    await server.close();
-    process.exit(0);
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'healthy', 
+    timestamp: new Date().toISOString(),
+    server: 'fast-mcp'
   });
-
-  async function runServer() {
-    const transport = new StdioServerTransport();
-    await server.connect(transport);
-    console.error("Fast MCP Server running on stdio");
-  }
-
-  return runServer();
-}
-
-initializeServer().catch((error) => {
-  console.error("Fatal error running server:", error);
-  process.exit(1);
 });
+
+// MCP endpoint
+app.post('/mcp', async (req, res) => {
+  const requestId = Math.random().toString(36).substring(7);
+  console.log(`[HTTP] Received MCP request ${requestId}`);
+  
+  try {
+    // Create a new server instance for this request to avoid conflicts
+    const server = new McpServer(
+      {
+        name: "fast-mcp",
+        version: "0.2.0",
+      },
+      {
+        capabilities: {
+          tools: {},
+          logging: {},
+        },
+      }
+    );
+
+    // Load tools from YAML configs
+    await loadToolsFromConfigs(server);
+
+    // Keep the original hello tool as an example
+    server.tool(
+      "hello_tool",
+      "Hello tool",
+      {
+        name: z.string().describe("The name of the person to greet"),
+      },
+      async ({ name }) => {
+        console.error("Hello tool", { name });
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Hello, ${name}!`,
+            },
+          ],
+        };
+      }
+    );
+
+    // Create transport for this request
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: undefined,
+    });
+
+    // Handle request cleanup
+    res.on('close', () => {
+      console.log(`[HTTP] Request ${requestId} closed`);
+      transport.close();
+    });
+
+    await server.connect(transport);
+    await transport.handleRequest(req, res, req.body);
+    console.log(`[HTTP] Request ${requestId} completed successfully`);
+  } catch (error) {
+    console.error('Error handling MCP request:', error);
+    if (!res.headersSent) {
+      res.status(500).json({
+        jsonrpc: '2.0',
+        error: {
+          code: -32603,
+          message: 'Internal server error',
+        },
+        id: null,
+      });
+    }
+  }
+});
+
+// Start the server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Fast MCP Server running on http://localhost:${PORT}`);
+});
+
+// Graceful shutdown
+process.on("SIGINT", () => {
+  console.log("Shutting down server...");
+  process.exit(0);
+});
+
