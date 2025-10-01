@@ -1,6 +1,6 @@
 name: "hg-rag"
 variables:
-  question: 
+  user_query: 
     required: true
 
 request_template:
@@ -11,14 +11,14 @@ request_template:
   BODY: |
     {
       "collection_name": "hg",
-      "query": "{question}",
+      "query": "{user_query}",
       "model_configuration": {
         "name": "truefoundry/openai-main/gpt-4o-mini",
         "parameters": {
           "temperature": 0.1
         }
       },
-      "prompt_template": "You are an AI assistant specialising in information retrieval and analysis. \\nQuestion: {question}",
+      "prompt_template": "You are an AI assistant specialising in information retrieval and analysis.  Answer the following question based only on the given context:\\nContext: {context}  \\nQuestion: {question}",
       "retriever_name": "vectorstore",
       "retriever_config": {
         "search_type": "similarity",
