@@ -43,7 +43,7 @@ app.post('/mcp', async (req, res) => {
 
     // Create transport for this request
     const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: () => uuid().toString(),
+      sessionIdGenerator: undefined,
     });
 
     // Handle request cleanup
