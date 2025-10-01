@@ -3,6 +3,114 @@ import { join } from 'path';
 import { z } from 'zod';
 import * as yaml from 'js-yaml';
 
+interface PostProcessorConfig {
+  maxLength?: number;
+  truncateAt?: 'words' | 'characters' | 'lines';
+  preserveFormatting?: boolean;
+}
+
+interface ResponseParserConfig {
+  enabled?: boolean;
+  fields?: string[];
+  format?: 'json' | 'text';
+  fallbackToFullResponse?: boolean;
+}
+
+function postProcessOutput(text: string, config: PostProcessorConfig = {}): string {
+  const {
+    maxLength = 2000,
+    truncateAt = 'characters',
+    preserveFormatting = true
+  } = config;
+
+  if (text.length <= maxLength) {
+    return text;
+  }
+
+  let truncated: string;
+
+  switch (truncateAt) {
+    case 'words':
+      const words = text.split(/\s+/);
+      const wordLimit = Math.floor(maxLength / 6); // Rough estimate: 6 chars per word
+      truncated = words.slice(0, wordLimit).join(' ');
+      break;
+    
+    case 'lines':
+      const lines = text.split('\n');
+      const lineLimit = Math.floor(maxLength / 50); // Rough estimate: 50 chars per line
+      truncated = lines.slice(0, lineLimit).join('\n');
+      break;
+    
+    case 'characters':
+    default:
+      truncated = text.substring(0, maxLength);
+      break;
+  }
+
+  // Add truncation indicator
+  const indicator = '\n\n[Output truncated for brevity...]';
+  const finalLength = truncated.length + indicator.length;
+  
+  if (finalLength > maxLength) {
+    truncated = truncated.substring(0, maxLength - indicator.length);
+  }
+
+  return truncated + indicator;
+}
+
+function parseResponse(responseText: string, config: ResponseParserConfig = {}): string {
+  const {
+    enabled = false,
+    fields = [],
+    format = 'text',
+    fallbackToFullResponse = true
+  } = config;
+
+  if (!enabled || fields.length === 0) {
+    return responseText;
+  }
+
+  try {
+    // Try to parse as JSON
+    const jsonResponse = JSON.parse(responseText);
+    
+    if (format === 'json') {
+      // Extract specified fields and return as JSON
+      const extractedData: Record<string, any> = {};
+      fields.forEach(field => {
+        if (field in jsonResponse) {
+          extractedData[field] = jsonResponse[field];
+        }
+      });
+      return JSON.stringify(extractedData, null, 2);
+    } else {
+      // Extract specified fields and return as formatted text
+      const extractedTexts: string[] = [];
+      fields.forEach(field => {
+        if (field in jsonResponse) {
+          const value = jsonResponse[field];
+          if (typeof value === 'string') {
+            extractedTexts.push(`${field}: ${value}`);
+          } else if (typeof value === 'object') {
+            extractedTexts.push(`${field}: ${JSON.stringify(value, null, 2)}`);
+          } else {
+            extractedTexts.push(`${field}: ${String(value)}`);
+          }
+        }
+      });
+      return extractedTexts.join('\n\n');
+    }
+  } catch (error) {
+    // If JSON parsing fails, return original response or fallback
+    if (fallbackToFullResponse) {
+      return responseText;
+    } else {
+      return `Error parsing JSON response: ${error instanceof Error ? error.message : 'Unknown error'}`;
+    }
+  }
+}
+
 interface VariableConfig {
   required?: boolean;
   default?: string;
@@ -19,6 +127,8 @@ interface YamlConfig {
   name: string;
   variables: Record<string, VariableConfig>;
   request_template: RequestTemplate;
+  post_processor?: PostProcessorConfig;
+  response_parser?: ResponseParserConfig;
 }
 
 export function parseYamlConfig(content: string): YamlConfig {
@@ -42,7 +152,9 @@ export function parseYamlConfig(content: string): YamlConfig {
         METHOD: parsed.request_template.METHOD || 'GET',
         HEADERS: parsed.request_template.HEADERS || [],
         BODY: parsed.request_template.BODY || ''
-      }
+      },
+      post_processor: parsed.post_processor || undefined,
+      response_parser: parsed.response_parser || undefined
     };
     
     return config;
@@ -142,20 +254,30 @@ export async function createToolFromConfig(config: YamlConfig, server: any) {
           responseText = `Response status: ${response.status} ${response.statusText}`;
         }
         
+        // Apply response parser to extract specific fields
+        const parsedResponseText = parseResponse(responseText, config.response_parser);
+        
+        // Apply post processor to reduce output size
+        const fullResponseText = `Request executed successfully:\n\nStatus: ${response.status} ${response.statusText}\n\nResponse:\n${parsedResponseText}`;
+        const processedText = postProcessOutput(fullResponseText, config.post_processor);
+        
         return {
           content: [
             {
               type: "text",
-              text: `Request executed successfully:\n\nStatus: ${response.status} ${response.statusText}\n\nResponse:\n${responseText}`,
+              text: processedText,
             },
           ],
         };
       } catch (error: any) {
+        const errorText = `Error executing request: ${error.message}`;
+        const processedErrorText = postProcessOutput(errorText, config.post_processor);
+        
         return {
           content: [
             {
               type: "text",
-              text: `Error executing request: ${error.message}`,
+              text: processedErrorText,
             },
           ],
         };

@@ -3,6 +3,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { z } from "zod";
 import express from "express";
 import { loadToolsFromConfigs } from "./create_tools.js";
+import { uuid } from "zod/v4";
 
 const app = express();
 app.use(express.json());
@@ -39,29 +40,10 @@ app.post('/mcp', async (req, res) => {
     // Load tools from YAML configs
     await loadToolsFromConfigs(server);
 
-    // Keep the original hello tool as an example
-    server.tool(
-      "hello_tool",
-      "Hello tool",
-      {
-        name: z.string().describe("The name of the person to greet"),
-      },
-      async ({ name }) => {
-        console.error("Hello tool", { name });
-        return {
-          content: [
-            {
-              type: "text",
-              text: `Hello, ${name}!`,
-            },
-          ],
-        };
-      }
-    );
 
     // Create transport for this request
     const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined,
+      sessionIdGenerator: () => uuid().toString(),
     });
 
     // Handle request cleanup

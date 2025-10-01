@@ -27,3 +27,14 @@ request_template:
         }
       }
     }
+
+response_parser:
+  enabled: true
+  fields: ["answer"]
+  format: "text"
+  fallbackToFullResponse: true
+
+post_processor:
+  maxLength: 1500
+  truncateAt: "characters"
+  preserveFormatting: true
