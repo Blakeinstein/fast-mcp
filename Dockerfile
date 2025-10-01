@@ -40,6 +40,6 @@ USER mcp
 EXPOSE 8096
 
 # Set the default command to run the MCP server via mcp-proxy
-CMD ["mcp-proxy", "--port=8096", "--host=0.0.0.0", "--transport=streamablehttp", "node", "dist/index.cjs"]
+CMD ["mcp-proxy", "--port=8096", "--host=0.0.0.0", "--transport=http", "node", "dist/index.cjs"]
 
 

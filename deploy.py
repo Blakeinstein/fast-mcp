@@ -35,7 +35,7 @@ service = Service(
             expose=True,
             app_protocol="http",
             host="ml.tfy-eo.truefoundry.cloud",
-            path="/fast-mcp-rishi-ws-8096/",
+            path="/fast-mcp-rishi-ws-8096",
         )
     ],
     replicas=1.0,
